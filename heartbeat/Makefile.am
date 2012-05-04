@@ -69,6 +69,7 @@ ocf_SCRIPTS	     =  ClusterMon		\
 			iSCSITarget		\
 			iSCSILogicalUnit	\
 			jboss			\
+			LUKS			\
 			LinuxSCSI		\
 			LVM			\
 			lxc			\

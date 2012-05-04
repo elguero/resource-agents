@@ -1,0 +1,65 @@
+#!/bin/sh
+#
+#  Resource Agent for managing a LUKS resource
+#
+#  License: GNU General Public License (GPL)
+#  Author: Michael L. Young (myoung@acsacc.com)
+#  Copyright: 2012 Administrative Claim Service, Inc.
+#  
+#
+
+# Initialization:
+: ${OCF_FUNCTIONS_DIR=${OCF_ROOT}/lib/heartbeat}
+. ${OCF_FUNCTIONS_DIR}/ocf-shellfuncs
+
+LUKS_meta-data() {
+
+}
+
+LUKS_validate-all() {
+
+}
+
+LUKS_start() {
+
+}
+
+LUKS_monitor() {
+
+}
+
+LUKS_stop() {
+
+}
+
+# Make sure meta-data and usage always succeed
+case $__OCF_ACTION in
+meta-data)	LUKS_meta_data
+		exit $OCF_SUCCESS
+		;;
+usage|help)	LUKS_usage
+		exit $OCF_SUCCESS
+		;;
+esac
+
+# Anything other than meta-data and usage must pass validation
+LUKS_validate_all || exit $?
+
+# Translate each action into the appropiate function call
+case $__OCF_ACTION in
+start)		LUKS_start;;
+stop)		LUKS_stop;;
+status|monitor)	LUKS_monitor;;
+reload)		ocf_log info "Reloading..."
+		LUKS_start
+		;;
+validate-all)	;;
+*)		LUKS_usage
+		exit $OCF_ERR_UNIMPLEMENTED
+		;;
+esac
+rc=$?
+
+# The resource agent may optionally log a debug message
+ocf_log debug "${OCF_RESOURCE_INSTANCE} $__OCF_ACTION returned $rc"
+exit $rc

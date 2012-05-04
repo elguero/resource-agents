@@ -68,6 +68,7 @@ man_MANS	       = ocf_heartbeat_AoEtarget.7 \
                           ocf_heartbeat_IPaddr.7 \
                           ocf_heartbeat_IPaddr2.7 \
                           ocf_heartbeat_IPsrcaddr.7 \
+                          ocf_heartbeat_LUKS.7 \
                           ocf_heartbeat_LVM.7 \
                           ocf_heartbeat_LinuxSCSI.7 \
                           ocf_heartbeat_MailTo.7 \
