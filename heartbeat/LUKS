@@ -94,7 +94,7 @@ ocf_release_lock_on_exit $LOCKFILE
 
 LUKS_start() {
 
-#	LUKS_validate_all || exit $?
+	LUKS_validate_all || exit $?
 
 	# check if resource already running, if so exit
 	if LUKS_monitor; then
@@ -121,17 +121,17 @@ LUKS_start() {
 	# unlock resource with key that we were given
 	case "$keytype" in
 		pass)
-			ocf_run echo "$key" | cryptsetup luksOpen "$OCF_RESKEY_encrypted_devicepath" "$OCF_RESKEY_devicename"
+			ocf_run `echo "$key" | cryptsetup luksOpen "$OCF_RESKEY_encrypted_devicepath" "$OCF_RESKEY_devicename"`
 			;;
 		file)
 			ocf_run cryptsetup -d "$key" luksOpen "$OCF_RESKEY_encrypted_devicepath" "$OCF_RESKEY_devicename"
 			;;
 	esac
 
-#	while ! LUKS_monitor; do
-#		ocf_log debug "LUKS resource has not started yet, waiting"
-#		sleep 1
-#	done
+	while ! LUKS_monitor; do
+		ocf_log debug "LUKS resource has not started yet, waiting"
+		sleep 1
+	done
 
 	# if we made it here, we successfully started the resource
 	return $OCF_SUCCESS
@@ -140,7 +140,7 @@ LUKS_start() {
 LUKS_monitor() {
 	local rc
 
-#	LUKS_validate_all || exit $?
+	LUKS_validate_all || exit $?
 
 	ocf_run cryptsetup status "$OCF_RESKEY_devicename"
 
@@ -164,7 +164,7 @@ LUKS_monitor() {
 LUKS_stop() {
 	local rc
 
-#	LUKS_validate_all || exit $?
+	LUKS_validate_all || exit $?
 
 	LUKS_monitor
 	rc=$?
@@ -183,10 +183,10 @@ LUKS_stop() {
 	# procceed to stop resource
 	ocf_run cryptsetup luksClose "$OCF_RESKEY_devicename"
 
-#	while LUKS_monitor; do
-#		ocf_log debug "LUKS device has not stopped yet, waiting"
-#		sleep 1
-#	done
+	while LUKS_monitor; do
+		ocf_log debug "LUKS device has not stopped yet, waiting"
+		sleep 1
+	done
 
 	# resource should be stopped now
 	return $OCF_SUCCESS
