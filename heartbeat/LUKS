@@ -12,24 +12,184 @@
 : ${OCF_FUNCTIONS_DIR=${OCF_ROOT}/lib/heartbeat}
 . ${OCF_FUNCTIONS_DIR}/ocf-shellfuncs
 
-LUKS_meta-data() {
+LUKS_meta_data() {
+cat << END
+<?xml version="1.0"?>
+<!DOCTYPE resource-agent SYSTEM "ra-api-1.dtd">
+<resource-agent name="LUKS" version="0.1">
+  <version>0.1</version>
+  <longdesc lang="en">
+LUKS resource agent brings up and down a LUKS device allowing
+the use of a password or a keyfile.  Please note that a password
+is probably not the most secure way of handling a LUKS device.  
+The best way would be to have a keyfile stored encrypted that is
+unencrypted at system startup.  That encrypted keyfile can then
+be used to for your LUKS encrypted device.
+  </longdesc>
+  <shortdesc lang="en">LUKS resource agent to start/stop/monitor LUKS 
+device.</shortdesc>
+  <parameters>
+    <parameter name="encrypted_devicepath" unique="1" required="1">
+      <longdesc lang="en">
+      This is the path to the encrypted device on the node.
+      </longdesc>
+      <shortdesc lang="en">Path to device</shortdesc>
+      <content type="string"/>
+    </parameter>
+    <parameter name="devicename" unique="1" required="1">
+      <longdesc lang="en">
+      This is the name that will be used for the device once it is unlocked.
+      </longdesc>
+      <shortdesc lang="en">Device name</shortdesc>
+      <content type="string"/>
+    </parameter>
+    <parameter name="password" unique="0" required="0">
+      <longdesc lang="en">
+      Plaintext password to be used to open the encrypted device.
+      </longdesc>
+      <shortdesc lang="en">Plaintext password</shortdesc>
+      <content type="string"/>
+    </parameter>
+    <parameter name="keyfile" unique="0" required="0">
+      <longdesc lang="en">
+      Location of keyfile to be used for opeing the encrypted device.
+      </longdesc>
+      <shortdesc lang="en">Keyfile location</shortdesc>
+      <content type="string"/>
+    </parameter>
+  </parameters>
+  <actions>
+    <action name="start"        timeout="20" />
+    <action name="stop"         timeout="20" />
+    <action name="monitor"      timeout="20"
+                                interval="10" depth="0" />
+    <action name="reload"       timeout="20" />
+    <action name="meta-data"    timeout="5" />
+    <action name="validate-all"   timeout="20" />
+  </actions>
+</resource-agent>
+END
+
+return $OCF_SUCCESS
 
 }
 
-LUKS_validate-all() {
+LUKS_validate_all() {
 
+	check_binary cryptsetup
+
+	# check if encrypted device is present
+	if ! ocf_is_probe; then
+		if [ ! -b "$OCF_RESKEY_encrypted_devicepath" ]; then
+			ocf_log err "$OCF_RESKEY_encrypted_devicepath is not present"
+			exit $OCF_ERR_CONFIGURED
+		fi
+	fi
+
+	return $OCF_SUCCESS
 }
+
+LOCKFILE=${HA_RSCTMP}/luks
+ocf_release_lock_on_exit $LOCKFILE
 
 LUKS_start() {
 
+#	LUKS_validate_all || exit $?
+
+	# check if resource already running, if so exit
+	if LUKS_monitor; then
+		ocf_log info "LUKS resource already running"
+		return $OCF_SUCCESS
+	fi
+
+	# set key to be used
+	if [ "$OCF_RESKEY_password" ]; then
+		key=$OCF_RESKEY_password
+		keytype="pass"
+	elif [ "$OCF_RESKEY_keyfile" ]; then
+		key=$OCF_RESKEY_keyfile
+		keytype="file"
+	fi
+
+	if [ ! "$key" ]; then
+		ocf_log info "LUKS password and keyfile not set"
+		return $OCF_ERR_CONFIGURED
+	fi
+
+	ocf_take_lock $LOCKFILE
+
+	# unlock resource with key that we were given
+	case "$keytype" in
+		pass)
+			ocf_run echo "$key" | cryptsetup luksOpen "$OCF_RESKEY_encrypted_devicepath" "$OCF_RESKEY_devicename"
+			;;
+		file)
+			ocf_run cryptsetup -d "$key" luksOpen "$OCF_RESKEY_encrypted_devicepath" "$OCF_RESKEY_devicename"
+			;;
+	esac
+
+#	while ! LUKS_monitor; do
+#		ocf_log debug "LUKS resource has not started yet, waiting"
+#		sleep 1
+#	done
+
+	# if we made it here, we successfully started the resource
+	return $OCF_SUCCESS
 }
 
 LUKS_monitor() {
+	local rc
 
+#	LUKS_validate_all || exit $?
+
+	ocf_run cryptsetup status "$OCF_RESKEY_devicename"
+
+	case "$?" in
+		0)
+			rc=$OCF_SUCCESS
+			ocf_log debug "LUKS device is active"
+			;;
+		4)
+			rc=$OCF_NOT_RUNNING
+			ocf_log debug "LUKS device is not active"
+			;;
+		*)
+			ocf_log err "LUKS resource has failed"
+			exit $OCF_ERR_GENERIC
+	esac
+
+	return $rc
 }
 
 LUKS_stop() {
+	local rc
 
+#	LUKS_validate_all || exit $?
+
+	LUKS_monitor
+	rc=$?
+	case "$rc" in
+		"$OCF_SUCCESS")
+			# resource running, normal behavior
+			ocf_log debug "LUKS device is currently open"
+			;;
+		"$OCF_NOT_RUNNING")
+			# resource not open, nothign to stop
+			ocf_log info "LUKS device is already stopped"
+			return $OCF_SUCCESS
+			;;
+	esac
+
+	# procceed to stop resource
+	ocf_run cryptsetup luksClose "$OCF_RESKEY_devicename"
+
+#	while LUKS_monitor; do
+#		ocf_log debug "LUKS device has not stopped yet, waiting"
+#		sleep 1
+#	done
+
+	# resource should be stopped now
+	return $OCF_SUCCESS
 }
 
 # Make sure meta-data and usage always succeed
